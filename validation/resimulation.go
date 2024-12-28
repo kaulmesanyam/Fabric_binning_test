@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -20,10 +21,13 @@ type ReSimulationManager struct {
 }
 
 type ResimulationMetrics struct {
-	TotalResimulated int32
-	SuccessfulResim  int32
-	FailedResim      int32
-	mutex            sync.RWMutex
+	TotalResimulated  int32
+	SuccessfulResim   int32
+	FailedResim       int32
+	ReSimulationTime  time.Duration
+	ValidationTime    time.Duration
+	ProcessingLatency time.Duration
+	mutex             sync.RWMutex
 }
 
 func NewReSimulationManager(worldState *core.WorldState, metrics *core.DetailedMetrics) *ReSimulationManager {
@@ -43,7 +47,6 @@ func (rm *ReSimulationManager) Start(done chan struct{}) {
 
 	processComplete := make(chan struct{})
 
-	// Start processing goroutine
 	go func() {
 		defer close(processComplete)
 
@@ -58,7 +61,6 @@ func (rm *ReSimulationManager) Start(done chan struct{}) {
 		rm.wg.Wait()
 	}()
 
-	// Wait for completion or done signal
 	select {
 	case <-processComplete:
 		fmt.Println("ReSimulationManager: Processing complete")
@@ -66,7 +68,6 @@ func (rm *ReSimulationManager) Start(done chan struct{}) {
 		fmt.Println("ReSimulationManager: Shutdown initiated")
 	}
 
-	// Cleanup
 	rm.status.Mutex.Lock()
 	rm.status.IsClosing = true
 	rm.status.Mutex.Unlock()
@@ -91,10 +92,23 @@ func (rm *ReSimulationManager) processReSimulations(done chan struct{}, workerID
 			rm.status.Mutex.RUnlock()
 
 			startTime := time.Now()
+			tx.Status = "resimulating"
+
 			if err := rm.handleTransaction(tx, done); err != nil {
-				fmt.Printf("Worker %d: Error handling transaction: %v\n", workerID, err)
+				fmt.Printf("Worker %d: Error handling transaction %d: %v\n", workerID, tx.ID, err)
+				tx.Status = "resimulation_failed"
+				atomic.AddInt32(&rm.metrics.FailedResim, 1)
 			} else {
-				fmt.Printf("Worker %d: Resimulated transaction in %v\n", workerID, time.Since(startTime))
+				processingTime := time.Since(startTime)
+				fmt.Printf("Worker %d: Resimulated transaction %d in %v\n",
+					workerID, tx.ID, processingTime)
+
+				rm.metrics.mutex.Lock()
+				rm.metrics.ProcessingLatency += processingTime
+				rm.metrics.mutex.Unlock()
+
+				tx.Status = "resimulation_success"
+				atomic.AddInt32(&rm.metrics.SuccessfulResim, 1)
 			}
 
 		case <-done:
@@ -104,50 +118,57 @@ func (rm *ReSimulationManager) processReSimulations(done chan struct{}, workerID
 }
 
 func (rm *ReSimulationManager) handleTransaction(tx *core.Transaction, done chan struct{}) error {
-	rm.metrics.mutex.Lock()
-	rm.metrics.TotalResimulated++
-	rm.metrics.mutex.Unlock()
+	startTime := time.Now()
+	atomic.AddInt32(&rm.metrics.TotalResimulated, 1)
+
+	defer func() {
+		rm.metrics.mutex.Lock()
+		rm.metrics.ProcessingLatency += time.Since(startTime)
+		rm.metrics.mutex.Unlock()
+	}()
 
 	// Resimulate with timeout
 	resimResult := make(chan *core.Transaction, 1)
 	errChan := make(chan error, 1)
 
 	go func() {
+		validationStart := time.Now()
 		if resimulatedTx, err := rm.reSimulateTransaction(tx); err != nil {
 			errChan <- err
 		} else {
 			resimResult <- resimulatedTx
 		}
+		rm.metrics.mutex.Lock()
+		rm.metrics.ValidationTime += time.Since(validationStart)
+		rm.metrics.mutex.Unlock()
 	}()
 
 	var resimulatedTx *core.Transaction
+
 	select {
 	case tx := <-resimResult:
 		resimulatedTx = tx
 	case err := <-errChan:
-		rm.updateMetrics(false)
-		return err
+		return fmt.Errorf("resimulation error: %v", err)
 	case <-done:
 		return fmt.Errorf("resimulation cancelled")
 	case <-time.After(time.Millisecond * 500):
-		rm.updateMetrics(false)
 		return fmt.Errorf("resimulation timeout")
 	}
 
 	// Validate resimulated transaction
 	if !rm.validateResimulation(resimulatedTx) {
-		rm.updateMetrics(false)
-		return fmt.Errorf("validation failed")
+		return fmt.Errorf("validation failed for resimulated transaction")
 	}
 
-	// Create new bin
+	// Create new bin for resimulated transaction
 	bin := &core.Bin{
 		ID:           resimulatedTx.ID,
 		Transactions: []*core.Transaction{resimulatedTx},
 		CreatedAt:    time.Now(),
 	}
 
-	// Try to send bin
+	// Try to send bin back to ordering service
 	rm.status.Mutex.RLock()
 	isClosing := rm.status.IsClosing
 	rm.status.Mutex.RUnlock()
@@ -155,12 +176,10 @@ func (rm *ReSimulationManager) handleTransaction(tx *core.Transaction, done chan
 	if !isClosing {
 		select {
 		case rm.BinChannel <- bin:
-			rm.updateMetrics(true)
 			return nil
 		case <-done:
 			return fmt.Errorf("send cancelled")
 		case <-time.After(time.Millisecond * 100):
-			rm.updateMetrics(false)
 			return fmt.Errorf("send timeout")
 		}
 	}
@@ -169,6 +188,7 @@ func (rm *ReSimulationManager) handleTransaction(tx *core.Transaction, done chan
 }
 
 func (rm *ReSimulationManager) reSimulateTransaction(tx *core.Transaction) (*core.Transaction, error) {
+	resimStart := time.Now()
 	rm.worldState.Mutex.RLock()
 	defer rm.worldState.Mutex.RUnlock()
 
@@ -199,61 +219,50 @@ func (rm *ReSimulationManager) reSimulateTransaction(tx *core.Transaction) (*cor
 		newTx.WriteSet[key] = value
 	}
 
+	rm.metrics.mutex.Lock()
+	rm.metrics.ReSimulationTime += time.Since(resimStart)
+	rm.metrics.mutex.Unlock()
+
 	return newTx, nil
 }
 
 func (rm *ReSimulationManager) validateResimulation(tx *core.Transaction) bool {
+	validationStart := time.Now()
 	rm.worldState.Mutex.RLock()
 	defer rm.worldState.Mutex.RUnlock()
 
+	success := true
 	for key, expectedValue := range tx.ReadSet {
 		if currentValue, exists := rm.worldState.State[key]; exists {
 			if currentValue != expectedValue {
-				return false
+				success = false
+				break
 			}
 		}
 	}
-	return true
-}
 
-func (rm *ReSimulationManager) updateMetrics(success bool) {
 	rm.metrics.mutex.Lock()
-	defer rm.metrics.mutex.Unlock()
+	rm.metrics.ValidationTime += time.Since(validationStart)
+	rm.metrics.mutex.Unlock()
 
-	if success {
-		rm.metrics.SuccessfulResim++
-	} else {
-		rm.metrics.FailedResim++
-	}
+	return success
 }
 
 // Getter methods for metrics
 func (rm *ReSimulationManager) GetTotalResimulated() int {
-	rm.metrics.mutex.RLock()
-	defer rm.metrics.mutex.RUnlock()
-	return int(rm.metrics.TotalResimulated)
+	return int(atomic.LoadInt32(&rm.metrics.TotalResimulated))
 }
 
 func (rm *ReSimulationManager) GetSuccessfulResimulations() int {
-	rm.metrics.mutex.RLock()
-	defer rm.metrics.mutex.RUnlock()
-	return int(rm.metrics.SuccessfulResim)
+	return int(atomic.LoadInt32(&rm.metrics.SuccessfulResim))
 }
 
 func (rm *ReSimulationManager) GetFailedResimulations() int {
-	rm.metrics.mutex.RLock()
-	defer rm.metrics.mutex.RUnlock()
-	return int(rm.metrics.FailedResim)
+	return int(atomic.LoadInt32(&rm.metrics.FailedResim))
 }
 
-// Key fixes:
-// 1. Better channel closing coordination
-// 2. Proper handling of done signal
-// 3. Fixed shutdown sequence
-// 4. Added status checks before sending
-// 5. Added timeout handling for all operations
-// 6. Better error handling and reporting
-// 7. Improved worker management
-// 8. More robust cleanup sequence
-
-// Try running the tests again with this updated version. The resimulation manager should handle shutdown more gracefully now.
+func (rm *ReSimulationManager) GetMetrics() ResimulationMetrics {
+	rm.metrics.mutex.RLock()
+	defer rm.metrics.mutex.RUnlock()
+	return *rm.metrics
+}

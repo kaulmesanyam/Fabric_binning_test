@@ -25,6 +25,7 @@ type CommitMetrics struct {
 	InvalidTxCount    int32
 	ResimulateTxCount int32
 	CommitTime        time.Duration
+	ValidationTime    time.Duration
 	mutex             sync.RWMutex
 }
 
@@ -62,12 +63,10 @@ func (cc *ConcurrentCommitter) Start(done chan struct{}) {
 					return
 				}
 
+				startTime := time.Now()
 				fmt.Printf("Committer: Processing block %d with %d transactions\n",
 					block.Number, len(block.Transactions))
 
-				startTime := time.Now()
-
-				// Process block based on strategy
 				if cc.Strategy == "independent" {
 					cc.processIndependentBlock(block, done)
 				} else {
@@ -78,7 +77,6 @@ func (cc *ConcurrentCommitter) Start(done chan struct{}) {
 				cc.metrics.CommitTime += time.Since(startTime)
 				cc.metrics.mutex.Unlock()
 
-				// Wait with timeout
 				completed := make(chan struct{})
 				go func() {
 					cc.wg.Wait()
@@ -101,7 +99,6 @@ func (cc *ConcurrentCommitter) Start(done chan struct{}) {
 		}
 	}()
 
-	// Wait for completion or done signal
 	select {
 	case <-processComplete:
 		fmt.Println("Committer: Processing complete")
@@ -109,7 +106,6 @@ func (cc *ConcurrentCommitter) Start(done chan struct{}) {
 		fmt.Println("Committer: Shutdown initiated")
 	}
 
-	// Cleanup
 	cc.status.Mutex.Lock()
 	cc.status.IsClosing = true
 	if !cc.status.IsClosed {
@@ -139,7 +135,12 @@ func (cc *ConcurrentCommitter) processIndependentBlock(block *core.Block, done c
 					return
 				default:
 					tx := block.Transactions[j]
+					validationStart := time.Now()
+
 					if cc.validateAndCommit(tx) {
+						cc.metrics.mutex.Lock()
+						cc.metrics.ValidationTime += time.Since(validationStart)
+						cc.metrics.mutex.Unlock()
 						fmt.Printf("Committed transaction in %v\n", time.Since(tx.Timestamp))
 					}
 				}
@@ -197,7 +198,12 @@ func (cc *ConcurrentCommitter) processDependentBlock(block *core.Block, done cha
 								}
 							}
 
+							validationStart := time.Now()
 							if cc.validateAndCommit(node.Transaction) {
+								cc.metrics.mutex.Lock()
+								cc.metrics.ValidationTime += time.Since(validationStart)
+								cc.metrics.mutex.Unlock()
+
 								node.Mutex.Lock()
 								node.Processed = true
 								node.Mutex.Unlock()
@@ -220,6 +226,14 @@ func (cc *ConcurrentCommitter) processDependentBlock(block *core.Block, done cha
 }
 
 func (cc *ConcurrentCommitter) validateAndCommit(tx *core.Transaction) bool {
+	startTime := time.Now()
+
+	defer func() {
+		cc.metrics.mutex.Lock()
+		cc.metrics.CommitTime += time.Since(startTime)
+		cc.metrics.mutex.Unlock()
+	}()
+
 	// Validate transaction
 	if !cc.validateTransaction(tx) {
 		cc.metrics.mutex.Lock()
@@ -229,11 +243,12 @@ func (cc *ConcurrentCommitter) validateAndCommit(tx *core.Transaction) bool {
 		// Send for resimulation
 		select {
 		case cc.ReSimChannel <- tx:
+			tx.Status = "invalid"
 			cc.metrics.mutex.Lock()
 			cc.metrics.ResimulateTxCount++
 			cc.metrics.mutex.Unlock()
 		case <-time.After(time.Millisecond * 100):
-			fmt.Printf("Timeout sending transaction for resimulation\n")
+			fmt.Printf("Timeout sending transaction %d for resimulation\n", tx.ID)
 		}
 		return false
 	}
@@ -243,9 +258,11 @@ func (cc *ConcurrentCommitter) validateAndCommit(tx *core.Transaction) bool {
 		cc.metrics.mutex.Lock()
 		cc.metrics.InvalidTxCount++
 		cc.metrics.mutex.Unlock()
+		tx.Status = "invalid"
 		return false
 	}
 
+	tx.Status = "valid"
 	cc.metrics.mutex.Lock()
 	cc.metrics.ValidTxCount++
 	cc.metrics.mutex.Unlock()
@@ -259,6 +276,7 @@ func (cc *ConcurrentCommitter) validateTransaction(tx *core.Transaction) bool {
 	for key, expectedValue := range tx.ReadSet {
 		if currentValue, exists := cc.worldState.State[key]; exists {
 			if currentValue != expectedValue {
+				fmt.Printf("Validation failed for transaction %d: readset mismatch\n", tx.ID)
 				return false
 			}
 		}
@@ -277,7 +295,7 @@ func (cc *ConcurrentCommitter) commitTransaction(tx *core.Transaction) error {
 		}
 		return nil
 	case <-time.After(time.Millisecond * 100):
-		return fmt.Errorf("commit timeout")
+		return fmt.Errorf("commit timeout for transaction %d", tx.ID)
 	}
 }
 

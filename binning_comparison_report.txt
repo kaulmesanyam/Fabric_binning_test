@@ -1,7 +1,7 @@
 ===============================================
 HYPERLEDGER FABRIC BINNING STRATEGY COMPARISON
 ===============================================
-Generated at: Sat, 28 Dec 2024 20:14:27 IST
+Generated at: Sun, 29 Dec 2024 03:11:30 IST
 
 Test Configuration:
 - System CPU Cores: 8
@@ -17,13 +17,48 @@ LOW CONTENTION SCENARIO (10% Dependency)
 ----------------------------------------
 
 Independent Binning Strategy:
-TEST TIMEOUT - Incomplete Results
+Performance Metrics:
+- Throughput: 118.66 TPS
+- Total Processing Time: 5.8655761s
+- Average Latency: 7.6261322s
+
+Transaction Metrics:
+- Total Transactions: 1000
+- Valid Transactions: 696 (69.6%)
+- Invalid Transactions: 652 (65.2%)
+- Re-simulated Transactions: 0 (0.0%)
+
+Resource Usage:
+- CPU Usage: 0.0%
+- Memory Usage: 1.8 MB
+- Peak Goroutines: 1
 
 Dependent Binning Strategy:
-TEST TIMEOUT - Incomplete Results
+Performance Metrics:
+- Throughput: 4.10 TPS
+- Total Processing Time: 12.6983962s
+- Average Latency: 8.7885601s
+
+Transaction Metrics:
+- Total Transactions: 1000
+- Valid Transactions: 52 (5.2%)
+- Invalid Transactions: 974 (97.4%)
+- Re-simulated Transactions: 0 (0.0%)
+
+Resource Usage:
+- CPU Usage: 0.0%
+- Memory Usage: 2.1 MB
+- Peak Goroutines: 1
 
 Comparative Analysis:
-Cannot perform comparison due to timeout in one or both strategies
+Performance Comparison:
+- Throughput Difference: 2797.6%
+- Valid Transaction Rate Difference: 1238.5%
+- Re-simulation Rate Difference: 0.0%
+
+Recommended Strategy: Independent Binning
+  * Independent strategy performs 2797.6% better in throughput
+  * Invalid transaction rates: Independent=65.2%, Dependent=97.4%
 
 ==============================================
 
@@ -31,13 +66,48 @@ MIXED CASE SCENARIO (50% Dependency)
 ----------------------------------------
 
 Independent Binning Strategy:
-TEST TIMEOUT - Incomplete Results
+Performance Metrics:
+- Throughput: 119.38 TPS
+- Total Processing Time: 5.8299139s
+- Average Latency: 15.5671438s
+
+Transaction Metrics:
+- Total Transactions: 1000
+- Valid Transactions: 696 (69.6%)
+- Invalid Transactions: 652 (65.2%)
+- Re-simulated Transactions: 0 (0.0%)
+
+Resource Usage:
+- CPU Usage: 0.0%
+- Memory Usage: 1.9 MB
+- Peak Goroutines: 1
 
 Dependent Binning Strategy:
-TEST TIMEOUT - Incomplete Results
+Performance Metrics:
+- Throughput: 4.10 TPS
+- Total Processing Time: 12.6833062s
+- Average Latency: 8.9141673s
+
+Transaction Metrics:
+- Total Transactions: 1000
+- Valid Transactions: 52 (5.2%)
+- Invalid Transactions: 974 (97.4%)
+- Re-simulated Transactions: 0 (0.0%)
+
+Resource Usage:
+- CPU Usage: 0.0%
+- Memory Usage: 2.1 MB
+- Peak Goroutines: 1
 
 Comparative Analysis:
-Cannot perform comparison due to timeout in one or both strategies
+Performance Comparison:
+- Throughput Difference: 2811.9%
+- Valid Transaction Rate Difference: 1238.5%
+- Re-simulation Rate Difference: 0.0%
+
+Recommended Strategy: Independent Binning
+  * Independent strategy performs 2811.9% better in throughput
+  * Invalid transaction rates: Independent=65.2%, Dependent=97.4%
 
 ==============================================
 
@@ -45,13 +115,48 @@ HIGH CONTENTION SCENARIO (90% Dependency)
 ----------------------------------------
 
 Independent Binning Strategy:
-TEST TIMEOUT - Incomplete Results
+Performance Metrics:
+- Throughput: 119.93 TPS
+- Total Processing Time: 5.8033439s
+- Average Latency: 16.8110032s
+
+Transaction Metrics:
+- Total Transactions: 1000
+- Valid Transactions: 696 (69.6%)
+- Invalid Transactions: 652 (65.2%)
+- Re-simulated Transactions: 0 (0.0%)
+
+Resource Usage:
+- CPU Usage: 0.0%
+- Memory Usage: 1.9 MB
+- Peak Goroutines: 1
 
 Dependent Binning Strategy:
-TEST TIMEOUT - Incomplete Results
+Performance Metrics:
+- Throughput: 12.90 TPS
+- Total Processing Time: 27.2840306s
+- Average Latency: 13.3638511s
+
+Transaction Metrics:
+- Total Transactions: 1000
+- Valid Transactions: 352 (35.2%)
+- Invalid Transactions: 824 (82.4%)
+- Re-simulated Transactions: 0 (0.0%)
+
+Resource Usage:
+- CPU Usage: 0.0%
+- Memory Usage: 2.0 MB
+- Peak Goroutines: 1
 
 Comparative Analysis:
-Cannot perform comparison due to timeout in one or both strategies
+Performance Comparison:
+- Throughput Difference: 829.6%
+- Valid Transaction Rate Difference: 97.7%
+- Re-simulation Rate Difference: 0.0%
+
+Recommended Strategy: Independent Binning
+  * Independent strategy performs 829.6% better in throughput
+  * Invalid transaction rates: Independent=65.2%, Dependent=82.4%
 
 ==============================================
 
@@ -61,27 +166,33 @@ OVERALL ANALYSIS
 1. Performance Patterns:
 
 At 10% Dependency:
-- Incomplete results due to timeout
+- Independent Strategy: 118.66 TPS
+- Dependent Strategy: 4.10 TPS
+- Performance Difference: 2797.6%
 
 At 50% Dependency:
-- Incomplete results due to timeout
+- Independent Strategy: 119.38 TPS
+- Dependent Strategy: 4.10 TPS
+- Performance Difference: 2811.9%
 
 At 90% Dependency:
-- Incomplete results due to timeout
+- Independent Strategy: 119.93 TPS
+- Dependent Strategy: 12.90 TPS
+- Performance Difference: 829.6%
 
 2. Resource Utilization Patterns:
 
 At 10% Dependency:
 - CPU Usage: Independent=0.0%, Dependent=0.0% (Diff: 0.0%)
-- Memory Usage: Independent=1.8 MB, Dependent=2.6 MB (Diff: -31.0%)
+- Memory Usage: Independent=1.8 MB, Dependent=2.1 MB (Diff: -11.0%)
 
 At 50% Dependency:
 - CPU Usage: Independent=0.0%, Dependent=0.0% (Diff: 0.0%)
-- Memory Usage: Independent=1.8 MB, Dependent=2.6 MB (Diff: -30.3%)
+- Memory Usage: Independent=1.9 MB, Dependent=2.1 MB (Diff: -11.4%)
 
 At 90% Dependency:
 - CPU Usage: Independent=0.0%, Dependent=0.0% (Diff: 0.0%)
-- Memory Usage: Independent=1.9 MB, Dependent=2.1 MB (Diff: -10.3%)
+- Memory Usage: Independent=1.9 MB, Dependent=2.0 MB (Diff: -8.6%)
 
 RECOMMENDATIONS
 ==============
@@ -89,10 +200,16 @@ RECOMMENDATIONS
 Based on test results:
 
 For 10% dependency ratio:
-- Insufficient data due to timeout
+- Recommended strategy: Independent Binning
+  * Independent strategy performs 2797.6% better in throughput
+  * Invalid transaction rates: Independent=65.2%, Dependent=97.4%
 
 For 50% dependency ratio:
-- Insufficient data due to timeout
+- Recommended strategy: Independent Binning
+  * Independent strategy performs 2811.9% better in throughput
+  * Invalid transaction rates: Independent=65.2%, Dependent=97.4%
 
 For 90% dependency ratio:
-- Insufficient data due to timeout
+- Recommended strategy: Independent Binning
+  * Independent strategy performs 829.6% better in throughput
+  * Invalid transaction rates: Independent=65.2%, Dependent=82.4%
