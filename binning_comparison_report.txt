@@ -1,0 +1,98 @@
+===============================================
+HYPERLEDGER FABRIC BINNING STRATEGY COMPARISON
+===============================================
+Generated at: Sat, 28 Dec 2024 20:14:27 IST
+
+Test Configuration:
+- System CPU Cores: 8
+- Transactions per Test: 1000
+- Maximum Bin Size: 25
+- Block Size: 50
+- Test Duration per Strategy: 1 minute
+
+==============================================
+
+
+LOW CONTENTION SCENARIO (10% Dependency)
+----------------------------------------
+
+Independent Binning Strategy:
+TEST TIMEOUT - Incomplete Results
+
+Dependent Binning Strategy:
+TEST TIMEOUT - Incomplete Results
+
+Comparative Analysis:
+Cannot perform comparison due to timeout in one or both strategies
+
+==============================================
+
+MIXED CASE SCENARIO (50% Dependency)
+----------------------------------------
+
+Independent Binning Strategy:
+TEST TIMEOUT - Incomplete Results
+
+Dependent Binning Strategy:
+TEST TIMEOUT - Incomplete Results
+
+Comparative Analysis:
+Cannot perform comparison due to timeout in one or both strategies
+
+==============================================
+
+HIGH CONTENTION SCENARIO (90% Dependency)
+----------------------------------------
+
+Independent Binning Strategy:
+TEST TIMEOUT - Incomplete Results
+
+Dependent Binning Strategy:
+TEST TIMEOUT - Incomplete Results
+
+Comparative Analysis:
+Cannot perform comparison due to timeout in one or both strategies
+
+==============================================
+
+OVERALL ANALYSIS
+===============
+
+1. Performance Patterns:
+
+At 10% Dependency:
+- Incomplete results due to timeout
+
+At 50% Dependency:
+- Incomplete results due to timeout
+
+At 90% Dependency:
+- Incomplete results due to timeout
+
+2. Resource Utilization Patterns:
+
+At 10% Dependency:
+- CPU Usage: Independent=0.0%, Dependent=0.0% (Diff: 0.0%)
+- Memory Usage: Independent=1.8 MB, Dependent=2.6 MB (Diff: -31.0%)
+
+At 50% Dependency:
+- CPU Usage: Independent=0.0%, Dependent=0.0% (Diff: 0.0%)
+- Memory Usage: Independent=1.8 MB, Dependent=2.6 MB (Diff: -30.3%)
+
+At 90% Dependency:
+- CPU Usage: Independent=0.0%, Dependent=0.0% (Diff: 0.0%)
+- Memory Usage: Independent=1.9 MB, Dependent=2.1 MB (Diff: -10.3%)
+
+RECOMMENDATIONS
+==============
+
+Based on test results:
+
+For 10% dependency ratio:
+- Insufficient data due to timeout
+
+For 50% dependency ratio:
+- Insufficient data due to timeout
+
+For 90% dependency ratio:
+- Insufficient data due to timeout
